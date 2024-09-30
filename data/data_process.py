@@ -6,14 +6,19 @@ import io   #입출력 관련 모듈 불러옴.
 sys.stdout = io.TextIOWrapper(sys.stdout.detach(), encoding='utf-8')  #파이썬의 기본 출력 스트림(sys.stdout)을 새롭게 설정하여 인코딩을 UTF-8로 변경.
 
 import pandas as pd
+import json
 
 file_path = 'data\makeup_review.xlsx'  #엑셀 파일 경로를 변수에 저장.
-
 text_data = pd.read_excel(file_path)  #변수에 pd.read_excel("엑셀 경로") 으로 엑셀 파일을 데이터프레임(DataFrame) 타입으로 할당.
 
-review = text_data['상품평']  #'상품평'이라는 열(Column)을 선택하여 해당 데이터를 'review' 변수에 할당.
+# **상품명과 리뷰를 각각 변수에 할당**
+products = text_data['상품명']  # **'상품명' 컬럼을 선택하여 해당 데이터를 'products' 변수에 할당**
+reviews = text_data['상품평']  # '상품평' 컬럼을 선택하여 해당 데이터를 'reviews' 변수에 할당.
 
-review_list = review.astype(str).tolist() # '상품평' 데이터를 문자열로 변환한 뒤 리스트로 변환하여 'review_list'에 저장.
+#review_list = review.astype(str).tolist() # '상품평' 데이터를 문자열로 변환한 뒤 리스트로 변환하여 'review_list'에 저장.
+
+# **리뷰 리스트와 상품명을 같이 저장**
+product_review_list = list(zip(products.astype(str).tolist(), reviews.astype(str).tolist()))  # **상품명과 리뷰를 튜플로 묶어 리스트 생성**
 
 """
 ### 결과 테스트 
@@ -36,41 +41,38 @@ stopwords = ['아', '하다', '휴', '아이구', '아이쿠', '아이고', '어
 def preprocess(review_list):
   processed_reviews = []
 
-  for review in review_list:
+  for product, review in review_list:
     review = re.sub(r'[^가-힣a-zA-Z0-9\s]', '', review) # 한글, 영어, 숫자, 공백만 남김.
 
     tokens = review.split() # 공백 기준으로 토큰화.
     filtered_tokens = [word for word in tokens if word not in stopwords]  # 위에서 정의했던 불용어들 빼고 리스트에 다시 저장.
 
-    processed_reviews.append(' '.join(filtered_tokens)) # 필터링 된 토큰들 다시 문자열로 결합하여 저장.
+    processed_reviews.append((product,' '.join(filtered_tokens))) # 필터링 된 토큰들 다시 문자열로 결합하여 저장.
   return processed_reviews
 
 
 ### 전처리 실행
-preprocessed_reviews = preprocess(review_list) # 함수 호출.
+preprocessed_reviews = preprocess(product_review_list) # 함수 호출.
 
 """
 ### 결과 테스트 - 9801개 돌리는데 7.183초
 for i, review in enumerate(preprocessed_reviews, 1):
   print(f"리뷰 {i} : {review}")
 """
-
+"""
 ### 리뷰 텍스트들 제이슨 형식으로 변환
 import json
 reviews_json = {str(i+1) : review for i, review in enumerate(preprocessed_reviews)} # 리뷰 번호와 리뷰 텍스트로 구성된 딕셔너리 생성.
 
 review_json_str = json.dumps(reviews_json, ensure_ascii=False, indent = 4)  # 딕셔너리를 JSON 문자열로 변환 (ensure_ascii=False로 설정하여 한글이 깨지지 않도록 설정, indent=4는 가독성을 위한 들여쓰기).
-"""
+
 print(review_json_str)
 """
 
 ### 일부만 발췌해서 테스트할때 (100개)
-review_list_test = preprocessed_reviews[:100]
-reviews_json_test = {str(i+1) : review for i, review in enumerate(review_list_test)}
-review_json_str_test = json.dumps(reviews_json_test, ensure_ascii=False, indent=4)
+preprocessed_reviews_test = preprocessed_reviews[:100]  # **100개의 데이터만 테스트용으로 발췌**
+reviews_json_test = {str(i+1): {'상품명': product, '리뷰': review} for i, (product, review) in enumerate(preprocessed_reviews_test)}  # **상품명과 리뷰를 JSON으로 변환**
 
-print(reviews_json_test)
-print(type(reviews_json_test))
 
 
 ### 네이버 API로 감정분석
@@ -83,9 +85,11 @@ headers = {
     "Content-Type": "application/json"
 }
 
-for review_id, review_text in reviews_json.items():  # 전체 데이터를 다 테스트할 땐 reviews_json_test 대신 revies_json 사용.
+results = {}  # 결과 저장할 딕셔너리.
+
+for review_id, review_data in reviews_json_test.items():  # 전체 데이터를 다 테스트할 땐 reviews_json_test 대신 revies_json 사용.
   data = {
-    "content" : review_text
+    "content" : review_data['리뷰'] # **리뷰 텍스트만 감정 분석에 사용**
   }
 
   response = requests.post(url, headers=headers, data=json.dumps(data))
@@ -93,10 +97,19 @@ for review_id, review_text in reviews_json.items():  # 전체 데이터를 다 �
   if response.status_code == 200:
     # JSON 응답 파싱, 예쁘게 출력.
     result = response.json()
-    formatted_result = json.dumps(result, ensure_ascii = False, indent=4)
-    print(f"리뷰 {review_id} 감정 분석 결과: ")
-    print(formatted_result)
+    results[review_id] = {
+      "상품평": review_data['상품명'],
+      "리뷰": review_data['리뷰'],
+      "감정분석결과": result
+    }
   else: 
     print(f"에러 발생: {response.status_code}, {response.text}")
 
+# 결과 JSON 파일로 저장
+with open('data/results.json', 'w', encoding='utf-8') as f:
+  json.dump(results, f, ensure_ascii=False, indent=4)
+
+print("감정 분석 결과를 data/results.json 파일에 저장했습니다.")
 ### 전체 데이터 돌리면 906개 이후 Quota Exceeded(쿼터 초과) 에러 뜸 - API 호출 한도를 초과했을 때 발생하는 에러.
+
+
