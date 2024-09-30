@@ -73,4 +73,30 @@ print(reviews_json_test)
 print(type(reviews_json_test))
 
 
+### 네이버 API로 감정분석
+import requests
+url = "https://naveropenapi.apigw.ntruss.com/sentiment-analysis/v1/analyze"
 
+headers = {
+    "X-NCP-APIGW-API-KEY-ID": "du3ih5txai",  # 네이버 클라우드 플랫폼 API 키 ID
+    "X-NCP-APIGW-API-KEY": "ec4m24HVhH9Zqf2kNRMjUmahTFxngIv8iCaeIqu0",  # 네이버 클라우드 플랫폼 API 시크릿
+    "Content-Type": "application/json"
+}
+
+for review_id, review_text in reviews_json.items():  # 전체 데이터를 다 테스트할 땐 reviews_json_test 대신 revies_json 사용.
+  data = {
+    "content" : review_text
+  }
+
+  response = requests.post(url, headers=headers, data=json.dumps(data))
+
+  if response.status_code == 200:
+    # JSON 응답 파싱, 예쁘게 출력.
+    result = response.json()
+    formatted_result = json.dumps(result, ensure_ascii = False, indent=4)
+    print(f"리뷰 {review_id} 감정 분석 결과: ")
+    print(formatted_result)
+  else: 
+    print(f"에러 발생: {response.status_code}, {response.text}")
+
+### 전체 데이터 돌리면 906개 이후 Quota Exceeded(쿼터 초과) 에러 뜸 - API 호출 한도를 초과했을 때 발생하는 에러.
