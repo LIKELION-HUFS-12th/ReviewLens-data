@@ -55,4 +55,22 @@ for i, review in enumerate(preprocessed_reviews, 1):
   print(f"리뷰 {i} : {review}")
 """
 
+### 리뷰 텍스트들 제이슨 형식으로 변환
+import json
+reviews_json = {str(i+1) : review for i, review in enumerate(preprocessed_reviews)} # 리뷰 번호와 리뷰 텍스트로 구성된 딕셔너리 생성.
+
+review_json_str = json.dumps(reviews_json, ensure_ascii=False, indent = 4)  # 딕셔너리를 JSON 문자열로 변환 (ensure_ascii=False로 설정하여 한글이 깨지지 않도록 설정, indent=4는 가독성을 위한 들여쓰기).
+"""
+print(review_json_str)
+"""
+
+### 일부만 발췌해서 테스트할때 (100개)
+review_list_test = preprocessed_reviews[:100]
+reviews_json_test = {str(i+1) : review for i, review in enumerate(review_list_test)}
+review_json_str_test = json.dumps(reviews_json_test, ensure_ascii=False, indent=4)
+
+print(reviews_json_test)
+print(type(reviews_json_test))
+
+
 
