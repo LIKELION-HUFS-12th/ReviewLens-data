@@ -1,47 +1,64 @@
 import json
 import matplotlib.pyplot as plt
 import seaborn as sns
-from wordcloud import WordCloud
 
-results_path = 'data/results.json' # JSON 파일 경로.
+results_path = 'data/results.json'  # JSON 파일 경로.
 
-# JSON 파일 가져옴
-with open('data/results.json', 'r', encoding='utf-8') as f:
-  results = json.load(f)
+# JSON 파일 가져오기
+with open(results_path, 'r', encoding='utf-8') as f:
+    results = json.load(f)
 
-# 감정별로 리뷰 분류
-positive_reviews = []
-neutral_reviews = []
-negative_reviews = []
+
+### 감정별로 리뷰 수 카운트
+sentiment_counts = {
+    'Positive': 0,
+    'Neutral': 0,
+    'Negative': 0
+}
 
 for review_id, data in results.items():
     sentiment = data['감정분석결과']['document']['sentiment']
-    review_text = data['리뷰']
     
     if sentiment == 'positive':
-        positive_reviews.append(review_text)
+        sentiment_counts['Positive'] += 1
     elif sentiment == 'neutral':
-        neutral_reviews.append(review_text)
+        sentiment_counts['Neutral'] += 1
     elif sentiment == 'negative':
-        negative_reviews.append(review_text)
+        sentiment_counts['Negative'] += 1
 
-# 감정별 리뷰 수 계산
-sentiment_counts = {
-    'Positive': len(positive_reviews),
-    'Neutral': len(neutral_reviews),
-    'Negative': len(negative_reviews)
-}
+# 감정별 리뷰 수 출력
+print("Sentiment Counts:")
+for sentiment, count in sentiment_counts.items():
+    print(f"{sentiment}: {count}")
 
 
 
-### Bar Chart
+x_labels = ['Positive', 'Neutral', 'Negative']
+
+### Bar Chart 그리기
 def plot_bar_chart(sentiment_counts):
     plt.figure(figsize=(8, 6))
-    sns.barplot(x=list(sentiment_counts.keys()), y=list(sentiment_counts.values()), palette='Set2')
-    plt.title("Sentiment Counts")
+    sns.barplot(x=x_labels, y=list(sentiment_counts.values()), palette='Set2')
+    plt.title("Review Lens")
     plt.xlabel("Sentiment")
     plt.ylabel("Count")
     plt.show()
 
-# 바 차트 그리기 함수 호출
+
+### Pie Chart 그리기
+def plot_pie_chart(sentiment_counts):
+    sizes = list(sentiment_counts.values())
+    colors = ['#ff9999','#66b3ff','#99ff99']  # 색상 
+    
+    plt.figure(figsize=(8, 8))
+    
+    plt.pie(sizes, labels=x_labels, autopct='%1.1f%%', startangle=90, colors=colors)
+    plt.axis('equal')  
+    
+    plt.title("Review Lens")
+    plt.show()
+
+
+# 함수 호출
 plot_bar_chart(sentiment_counts)
+plot_pie_chart(sentiment_counts)
