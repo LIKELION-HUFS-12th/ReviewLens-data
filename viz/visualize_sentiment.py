@@ -49,12 +49,9 @@ def plot_bar_chart(sentiment_counts):
 def plot_pie_chart(sentiment_counts):
     sizes = list(sentiment_counts.values())
     colors = ['#ff9999','#66b3ff','#99ff99']  # 색상 
-    
     plt.figure(figsize=(8, 8))
-    
     plt.pie(sizes, labels=x_labels, autopct='%1.1f%%', startangle=90, colors=colors)
     plt.axis('equal')  
-    
     plt.title("Review Lens")
     plt.show()
 

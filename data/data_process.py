@@ -91,7 +91,7 @@ for review_id, review_data in reviews_json_test.items():  # 전체 데이터를 
     # JSON 응답 파싱, 예쁘게 출력.
     result = response.json()
     results[review_id] = {
-      "상품평": review_data['상품명'],
+      "상품명": review_data['상품명'],
       "리뷰": review_data['리뷰'],
       "감정분석결과": result
     }
