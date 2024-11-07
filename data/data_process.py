@@ -8,7 +8,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.detach(), encoding='utf-8')  #파이썬
 import pandas as pd
 import json
 
-file_path = 'data\makeup_review.xlsx'  #엑셀 파일 경로를 변수에 저장.
+file_path = 'ReviewLens-data/data/fashion_m.xlsx'  #엑셀 파일 경로를 변수에 저장.
 text_data = pd.read_excel(file_path)  #변수에 pd.read_excel("엑셀 경로") 으로 엑셀 파일을 데이터프레임(DataFrame) 타입으로 할당.
 
 # 상품명과 리뷰를 각각 변수에 할당
@@ -47,26 +47,26 @@ def preprocess(review_list):
 ### 전처리 실행
 preprocessed_reviews = preprocess(product_review_list) # 함수 호출.
 
-"""
-### 결과 테스트 - 9801개 돌리는데 7.183초
+
+### 결과 테스트 - 전체 돌렸는데 꽤 오래 걸림 켜놓고 기다리지 못할 정도? 25분 이상
+## 100개씩 잘라서 데이터 쌓는 방법은 어떨지?
 for i, review in enumerate(preprocessed_reviews, 1):
   print(f"리뷰 {i} : {review}")
 """
+뭐 지워진 거 없는지 확인할 것
 """
 ### 리뷰 텍스트들 제이슨 형식으로 변환
 import json
-reviews_json = {str(i+1) : review for i, review in enumerate(preprocessed_reviews)} # 리뷰 번호와 리뷰 텍스트로 구성된 딕셔너리 생성.
-
+#reviews_json = {str(i+1) : review for i, review in enumerate(preprocessed_reviews)} # 리뷰 번호와 리뷰 텍스트로 구성된 딕셔너리 생성.
+reviews_json = {str(i + 1): {'상품명': product, '리뷰': review} for i, (product, review) in enumerate(preprocessed_reviews)}
 review_json_str = json.dumps(reviews_json, ensure_ascii=False, indent = 4)  
 
-print(review_json_str)
 """
-
 ### 일부만 발췌해서 테스트할때 (100개)
 preprocessed_reviews_test = preprocessed_reviews[:100]  # 100개의 데이터만 테스트용으로 발췌
 reviews_json_test = {str(i+1): {'상품명': product, '리뷰': review} for i, (product, review) in enumerate(preprocessed_reviews_test)}  # 상품명과 리뷰를 JSON으로 변환
-
-
+print(review_json_str)
+"""
 
 ### 네이버 API로 감정분석
 import requests
@@ -78,9 +78,9 @@ headers = {
     "Content-Type": "application/json"
 }
 
+# 한 번에 데이터 처리
 results = {}  # 결과 저장할 딕셔너리.
-
-for review_id, review_data in reviews_json_test.items():  # 전체 데이터를 다 테스트할 땐 reviews_json_test 대신 reviews_json 사용.
+for review_id, review_data in reviews_json.items():  # 전체 데이터를 다 테스트할 땐 reviews_json_test 대신 reviews_json 사용.
   data = {
     "content" : review_data['리뷰'] # 리뷰 텍스트만 감정 분석에 사용
   }
@@ -100,10 +100,39 @@ for review_id, review_data in reviews_json_test.items():  # 전체 데이터를 
 
 
 # 결과 JSON 파일로 저장
-with open('data/results.json', 'w', encoding='utf-8') as f:
+with open('ReviewLens-data/data/results_3.json', 'w', encoding='utf-8') as f:
   json.dump(results, f, ensure_ascii=False, indent=4)
 
-print("감정 분석 결과를 data/results.json 파일에 저장했습니다.")
+print("감정 분석 결과를 data/results_3.json 파일에 저장했습니다.")
 
+"""
+# 1000개씩 슬라이싱해서 하나의 파일로 저장
+results = {}
+batch_size = 1000  # 슬라이싱 크기 설정
 
+# 리뷰를 1000개씩 슬라이싱하여 처리
+for i in range(0, len(preprocessed_reviews), batch_size):
+    sliced_reviews = preprocessed_reviews[i:i + batch_size]
+    sliced_results = {}
+
+    for review_id, (product, review) in enumerate(sliced_reviews, i + 1):
+        data = {"content": review}
+        response = requests.post(url, headers=headers, data=json.dumps(data))
+
+        if response.status_code == 200:
+            result = response.json()
+            sliced_results[str(review_id)] = {
+                "상품명": product,
+                "리뷰": review,
+                "감정분석결과": result
+            }
+        else:
+            print(f"에러 발생: {response.status_code}, {response.text}")
+
+    # 슬라이스 결과를 파일에 추가 저장
+    with open('ReviewLens-data/data/results_3.json', 'a', encoding='utf-8') as f:
+        json.dump(sliced_results, f, ensure_ascii=False, indent=4)
+
+print("감정 분석 결과를 data/results_3.json 파일에 저장했습니다.")
+"""
 

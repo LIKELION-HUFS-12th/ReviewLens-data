@@ -2,7 +2,7 @@ import json
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-results_path = 'data/results.json'  # JSON 파일 경로.
+results_path = 'ReviewLens-data/data/results_3.json'  # JSON 파일 경로.
 
 # JSON 파일 가져오기
 with open(results_path, 'r', encoding='utf-8') as f:
