@@ -1,8 +1,15 @@
 import json
 import matplotlib.pyplot as plt
+from matplotlib import font_manager, rc
+import os
+import numpy as np
+import matplotlib
 
-plt.rcParams['font.family'] = 'AppleGothic'
-plt.rcParams['axes.unicode_minus'] = False
+# 나눔고딕 코딩 폰트 파일 경로 지정
+font_path = "font/NGULIM.TTF"  # 실제 경로로 수정해주세요
+font_name = font_manager.FontProperties(fname=font_path).get_name()
+rc('font', family=font_name)
+
 
 # 결과 불러오기
 def load_result(path):
@@ -67,16 +74,20 @@ def count_for_indiv(results):
 def charts(ps_counts, output_file_prefix):
     num_products = len(ps_counts)
     max_products_per_image = 5  # 한 이미지에 포함할 최대 제품 수
-    total_images = (num_products // max_products_per_image) + 1
+    total_images = (num_products // max_products_per_image) + (1 if num_products % max_products_per_image > 0 else 0)
 
     for img_index in range(total_images):
         start = img_index * max_products_per_image
         end = min(start + max_products_per_image, num_products)
-        
+
+        output_dir = os.path.dirname(output_file_prefix)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            
         if end - start <= 0:
             break
         
-        fig, axes = plt.subplots(end - start, 2, figsize=(8, 5 * (end - start)))
+        fig, axes = plt.subplots(end - start, 2, figsize=(12, 5 * (end - start)))
         fig.tight_layout(pad=5.0)
 
         for i, (product, counts) in enumerate(list(ps_counts.items())[start:end]):
@@ -84,13 +95,21 @@ def charts(ps_counts, output_file_prefix):
             values = list(counts.values())
             colors = ['#66b3ff', '#99ff99', '#ff9999']
 
+            # 막대그래프 그리기
             axes[i, 0].bar(sentiments, values, color=colors)
             axes[i, 0].set_title(f"Sentiment Analysis (Bar Chart) for {product}", loc='left')
             axes[i, 0].set_xlabel("Sentiment")
             axes[i, 0].set_ylabel("Count")
 
-            axes[i, 1].pie(values, labels=sentiments, autopct='%1.1f%%', startangle=90, colors=colors)
-            axes[i, 1].axis('equal')
+            # 파이차트 그리기 전에 합계가 0인지 확인
+            if np.sum(values) == 0:
+                axes[i, 1].text(0.5, 0.5, 'No data available', horizontalalignment='center', verticalalignment='center')
+                axes[i, 1].set_title(f"Sentiment Analysis (Pie Chart) for {product}", loc='left')
+                axes[i, 1].axis('off')
+            else:
+                axes[i, 1].pie(values, labels=sentiments, autopct='%1.1f%%', startangle=90, colors=colors)
+                axes[i, 1].set_title(f"Sentiment Analysis (Pie Chart) for {product}", loc='left')
+                axes[i, 1].axis('equal')
 
         # 이미지 저장
         output_file = f"{output_file_prefix}_page_{img_index + 1}.png"
@@ -99,8 +118,9 @@ def charts(ps_counts, output_file_prefix):
         print(f"Saved {output_file}")
 
 
+
 # 감정 분석 결과 파일 로드
-results_path = 'result/sentiment_analysis_result.json'
+results_path = 'result/sentiment_analysis_result_clovastudio.json'
 results = load_result(results_path)
 
 # 전체 감정 비율 파이 차트로 저장

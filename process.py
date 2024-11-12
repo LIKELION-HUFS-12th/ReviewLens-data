@@ -104,5 +104,5 @@ def main_process(file_path):
     result_list = analyze_reviews(review_list_test)
     process_sentiment_analysis(result_list, original_review_list_test, product_list_test)
 
-file_path = 'C:/Users/defqw/OneDrive/바탕 화면/reviewlens/ReviewLens-data/reviews/메이크업뷰티케어_reviews.xlsx'
+file_path = 'reviews/메이크업뷰티케어_reviews.xlsx'
 main_process(file_path)
