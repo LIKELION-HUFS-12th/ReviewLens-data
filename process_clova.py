@@ -1,14 +1,8 @@
 import pandas as pd
 import re
 import json
-import torch
-from transformers import BertForSequenceClassification
-from kobert_transformers import get_tokenizer
-from scipy.special import softmax
+import requests
 
-MODEL_NAME = "monologg/kobert"
-tokenizer = get_tokenizer()
-model = BertForSequenceClassification.from_pretrained(MODEL_NAME, num_labels=2)
 
 def load_file(file_path):
     text_data = pd.read_excel(file_path)
@@ -24,17 +18,16 @@ def preprocess(review_list):
     original_reviews = [] 
     
     for review in review_list:
-        # 원본 리뷰에서 \n과 같은 불필요한 줄바꿈 문자를 제거
         cleaned_original_review = re.sub(r'\s+', ' ', review).strip() 
-        original_reviews.append(cleaned_original_review)  # 원본 리뷰 저장
+        original_reviews.append(cleaned_original_review)
         
-        # 전처리 작업
-        review_cleaned = re.sub(r'[^가-힣a-zA-Z0-9\s]', '', cleaned_original_review)  # 특수문자 제거
+        review_cleaned = re.sub(r'[^가-힣a-zA-Z0-9\s]', '', cleaned_original_review)
         tokens = review_cleaned.split()
         filtered_tokens = [word for word in tokens if word not in stopwords] 
-        processed_reviews.append(' '.join(filtered_tokens))  # 전처리된 리뷰 저장
+        processed_reviews.append(' '.join(filtered_tokens))
         
     return original_reviews, processed_reviews
+
 
 def create_test_data(preprocessed_reviews, original_reviews, product_names, sample_size=5):
     if sample_size == 'max':
@@ -49,60 +42,97 @@ def create_test_data(preprocessed_reviews, original_reviews, product_names, samp
     return review_list_test, original_review_list_test, product_list_test
 
 
-def analyze_sentiment(review):
-    inputs = tokenizer(review, return_tensors="pt", truncation=True, padding=True,
-                       clean_up_tokenization_spaces=True)
-    with torch.no_grad():
-        outputs = model(**inputs)
-        scores = outputs.logits[0].numpy()
-    scores = softmax(scores)
+def analyze_reviews_clova_studio(preprocessed_reviews):
+    host = 'https://clovastudio.stream.ntruss.com'
+    api_key = 'NTA0MjU2MWZlZTcxNDJiYzCfHM1duMGVmI101pNbw6DRY8rHVXsyr1bq0e2r332L'
+    api_key_primary_val = 'QjtD5GeFK6qBSlyFwpYo50Vrn6aURfdCG6SySOUE'
+    request_id = '26eb069872414eb480d79bd6ccf640d1'
 
-    sentiment = "긍정" if scores[1] > scores[0] else "부정"
-    confidence = float(scores[1]) if sentiment == "긍정" else float(scores[0])
-    return sentiment, confidence
-
-def analyze_reviews(preprocessed_reviews):
     result_list = []
+    
     for review in preprocessed_reviews:
-        sentiment, confidence = analyze_sentiment(review)
-        result_list.append({
-            "review": review,
-            "sentiment": sentiment,
-            "confidence": confidence
-        })
+        preset_text = [
+            {"role": "system", "content": "이것은 상품 리뷰에 대한 감정 분석기입니다. (positive/neutral/negative) 세 가지 중 하나로 감정 분석 결과를 간단히 제공해주세요. 결과는 반드시 'positive', 'neutral', 'negative' 중 하나로만 답변해주세요."},
+            {"role": "user", "content": review}
+        ]
+        
+        request_data = {
+            'messages': preset_text,
+            'topP': 0.6,
+            'topK': 0,
+            'maxTokens': 20,  
+            'temperature': 0.1,
+            'repeatPenalty': 1.2,
+            'stopBefore': [],
+            'includeAiFilters': True,
+            'seed': 0
+        }
+        
+        headers = {
+            'X-NCP-CLOVASTUDIO-API-KEY': api_key,
+            'X-NCP-APIGW-API-KEY': api_key_primary_val,
+            'X-NCP-CLOVASTUDIO-REQUEST-ID': request_id,
+            'Content-Type': 'application/json; charset=utf-8',
+            'Accept': 'application/json'
+        }
+
+        response = requests.post(host + '/testapp/v1/chat-completions/HCX-DASH-001', headers=headers, json=request_data)
+
+        if response.status_code == 200:
+            try:
+                result = response.json()  
+                # 응답에서 감정 분석 결과 추출
+                message_content = result['result']['message']['content'].strip()
+                if message_content in ["positive", "neutral", "negative"]:
+                    sentiment = message_content
+                else:
+                    sentiment = "unknown"
+
+                result_list.append({"review": review, "sentiment": sentiment})
+            except json.JSONDecodeError as e:
+                print(f"JSON 디코딩 에러: {e}")
+                result_list.append({"review": review, "sentiment": "error"})
+        else:
+            print(f"에러 발생: {response.status_code}, {response.text}")
+            result_list.append({"review": review, "sentiment": "error"})
+
     return result_list
 
 
-# 감정 분석 결과를 처리, 저장하는 함수
+
 def process_sentiment_analysis(sentiment_data_list, original_reviews, product_list_test):
     summary = []
-    for i, result in enumerate(sentiment_data_list):
+    
+    for i, sentiment_data in enumerate(sentiment_data_list):
+        document_sentiment = sentiment_data.get('sentiment', 'unknown')
+        product_name_cleaned = product_list_test[i].replace(" ", "")
+
         document_summary = {
-            "product_name": product_list_test[i].replace(" ", ""),
+            "product_name": product_name_cleaned,
             "original_content": original_reviews[i],
-            "combined_content": result["review"],
-            "document_sentiment": result["sentiment"],
-            "confidence": result["confidence"]
+            "document_sentiment": document_sentiment
         }
         summary.append(document_summary)
-
+        
     result = json.dumps(summary, ensure_ascii=False, indent=4)
-    print(result)
-    # output_file_path = 'result/sentiment_analysis_result_kobert.json'
-    # with open(output_file_path, 'w', encoding='utf-8') as file:
-    #     file.write(result)
 
-    # print(f"결과가 {output_file_path}에 저장되었습니다.")
+    output_file_path = 'result/sentiment_analysis_result_clovastudio.json'
+    with open(output_file_path, 'w', encoding='utf-8') as file:
+        file.write(result)
+
+    print(f"결과가 {output_file_path}에 저장되었습니다.")
 
 
-
+## 데이터 전처리 및 감성 분석
 def main_process(file_path):
     review_list, product_names = load_file(file_path)
     original_reviews, preprocessed_reviews = preprocess(review_list)
-    review_list_test, original_review_list_test, product_list_test = \
-        create_test_data(preprocessed_reviews, original_reviews, product_names, sample_size=10)
-    result_list = analyze_reviews(review_list_test)
+    review_list_test, original_review_list_test, product_list_test = create_test_data(preprocessed_reviews, original_reviews, product_names, sample_size=10)
+    result_list = analyze_reviews_clova_studio(review_list_test)
     process_sentiment_analysis(result_list, original_review_list_test, product_list_test)
 
-file_path = 'C:/Users/defqw/OneDrive/바탕 화면/reviewlens/ReviewLens-data/reviews/메이크업뷰티케어_reviews.xlsx'
+
+file_path = 'reviews/메이크업뷰티케어_reviews.xlsx'
 main_process(file_path)
+
+
