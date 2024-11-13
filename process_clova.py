@@ -2,7 +2,7 @@ import pandas as pd
 import re
 import json
 import requests
-
+import time
 
 def load_file(file_path):
     print("파일 로딩 중...")
@@ -37,25 +37,28 @@ def create_test_data(preprocessed_reviews, original_reviews, product_names, samp
     else:
         max_size = min(sample_size, len(preprocessed_reviews), len(original_reviews), len(product_names))
     
-    review_list_test = preprocessed_reviews[:max_size]
-    original_review_list_test = original_reviews[:max_size]
-    product_list_test = product_names[:max_size]
+    preprocessed_reviews_sliced = preprocessed_reviews[:max_size]
+    original_review_list_sliced = original_reviews[:max_size]
+    product_list_sliced = product_names[:max_size]
     
-    return review_list_test, original_review_list_test, product_list_test
+    return preprocessed_reviews_sliced, original_review_list_sliced, product_list_sliced
 
 
-def analyze_reviews_clova_studio(preprocessed_reviews):
+def analyze_reviews_clova_studio(preprocessed_reviews_sliced):
     print("데이터 전처리 완료. 감정 분석 시작...")
+    start_time = time.time()
+
     host = 'https://clovastudio.stream.ntruss.com'
     api_key = 'NTA0MjU2MWZlZTcxNDJiYzCfHM1duMGVmI101pNbw6DRY8rHVXsyr1bq0e2r332L'
     api_key_primary_val = 'QjtD5GeFK6qBSlyFwpYo50Vrn6aURfdCG6SySOUE'
     request_id = '26eb069872414eb480d79bd6ccf640d1'
 
     result_list = []
-    
-    for review in preprocessed_reviews:
+    for i, review in enumerate(preprocessed_reviews_sliced):
+        print(f'전체 {len(preprocessed_reviews_sliced)}개 데이터 중 {i+1}번 째 데이터 {int((i+1)/len(preprocessed_reviews_sliced) * 100)}% 완료')
+
         preset_text = [
-            {"role": "system", "content": "이것은 상품 리뷰에 대한 감정 분석기입니다. (positive/neutral/negative) 세 가지 중 하나로 감정 분석 결과를 간단히 제공해주세요. 결과는 반드시 'positive', 'neutral', 'negative' 중 하나로만 답변해주세요."},
+            {"role": "system", "content": "이것은 상품 리뷰에 대한 감정 분석기입니다. 리뷰가 긍정적이라면 'positive', 중립이면 'neutral', 부정적이면 'negative'만으로 답변해주세요. 세 가지 외 다른 답변이 나오면 안됩니다."},
             {"role": "user", "content": review}
         ]
         
@@ -79,26 +82,31 @@ def analyze_reviews_clova_studio(preprocessed_reviews):
             'Accept': 'application/json'
         }
 
-        response = requests.post(host + '/testapp/v1/chat-completions/HCX-DASH-001', headers=headers, json=request_data)
+        try:
+            response = requests.post(host + '/testapp/v1/chat-completions/HCX-DASH-001', headers=headers, json=request_data)
+            response.raise_for_status()
+            
+            result = response.json()
+            message_content = result['result']['message']['content'].strip()
+            
+            if message_content in ["positive", "neutral", "negative"]:
+                sentiment = message_content
+            else:
+                print(f"예상치 않은 응답: {message_content}. 기본값 'neutral'로 설정.")
+                sentiment = "neutral"  # 예상치 않은 응답은 "neutral"로 기본 처리
 
-        if response.status_code == 200:
-            try:
-                result = response.json()  
-                # 응답에서 감정 분석 결과 추출
-                message_content = result['result']['message']['content'].strip()
-                if message_content in ["positive", "neutral", "negative"]:
-                    sentiment = message_content
-                else:
-                    sentiment = "unknown"
-
-                result_list.append({"review": review, "sentiment": sentiment})
-            except json.JSONDecodeError as e:
-                print(f"JSON 디코딩 에러: {e}")
-                result_list.append({"review": review, "sentiment": "error"})
-        else:
-            print(f"에러 발생: {response.status_code}, {response.text}")
-            result_list.append({"review": review, "sentiment": "error"})
-
+        except json.JSONDecodeError as e:
+            print(f"JSON 디코딩 에러: {e}.")
+            sentiment = "error"  
+        except requests.exceptions.RequestException as e:
+            print(f"API 요청 에러: {e}.")
+            sentiment = "error" 
+        
+        result_list.append({"review": review, "sentiment": sentiment})
+        
+    end_time = time.time()
+    total_time = end_time - start_time
+    print(f"감정 분석 완료. 총 소요 시간: {total_time:.2f}초")
     return result_list
 
 
@@ -107,7 +115,7 @@ def process_sentiment_analysis(sentiment_data_list, original_reviews, product_li
     summary = []
     
     for i, sentiment_data in enumerate(sentiment_data_list):
-        document_sentiment = sentiment_data.get('sentiment', 'unknown')
+        document_sentiment = sentiment_data.get('sentiment', 'neutral')
         product_name_cleaned = product_list_test[i].replace(" ", "")
 
         document_summary = {
@@ -119,18 +127,18 @@ def process_sentiment_analysis(sentiment_data_list, original_reviews, product_li
         
     result = json.dumps(summary, ensure_ascii=False, indent=4)
 
-    output_file_path = 'result/sentiment_analysis_result_clovastudio.json'
+    output_file_path = 'result/sentiment_analysis_result_clovastudio_test.json'
     with open(output_file_path, 'w', encoding='utf-8') as file:
         file.write(result)
 
     print(f"결과가 {output_file_path}에 저장되었습니다.")
 
 
-## 데이터 전처리 및 감성 분석
+## 데이터 전처리 및 감성 분석 
 def main_process(file_path):
     review_list, product_names = load_file(file_path)
     original_reviews, preprocessed_reviews = preprocess(review_list)
-    review_list_test, original_review_list_test, product_list_test = create_test_data(preprocessed_reviews, original_reviews, product_names, sample_size='max')
+    review_list_test, original_review_list_test, product_list_test = create_test_data(preprocessed_reviews, original_reviews, product_names, sample_size=100)
     result_list = analyze_reviews_clova_studio(review_list_test)
     process_sentiment_analysis(result_list, original_review_list_test, product_list_test)
 
