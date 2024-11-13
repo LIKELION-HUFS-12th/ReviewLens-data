@@ -5,13 +5,11 @@ import os
 import numpy as np
 import matplotlib
 
-# 나눔고딕 코딩 폰트 파일 경로 지정
-font_path = "font/NGULIM.TTF"  # 실제 경로로 수정해주세요
+font_path = "font/NGULIM.TTF"
 font_name = font_manager.FontProperties(fname=font_path).get_name()
 rc('font', family=font_name)
 
 
-# 결과 불러오기
 def load_result(path):
     with open(path, 'r', encoding='utf-8') as f:
         results = json.load(f)
