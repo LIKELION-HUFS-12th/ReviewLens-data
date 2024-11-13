@@ -55,7 +55,8 @@ def analyze_reviews_clova_studio(preprocessed_reviews_sliced):
 
     result_list = []
     for i, review in enumerate(preprocessed_reviews_sliced):
-        print(f'전체 {len(preprocessed_reviews_sliced)}개 데이터 중 {i+1}번 째 데이터 {int((i+1)/len(preprocessed_reviews_sliced) * 100)}% 완료')
+        progress = (i + 1) / len(preprocessed_reviews_sliced) * 100
+        print(f'전체 {len(preprocessed_reviews_sliced)}개 데이터 중 {i+1}번 째 데이터 {progress:.2f}% 완료')
 
         preset_text = [
             {"role": "system", "content": "이것은 상품 리뷰에 대한 감정 분석기입니다. 리뷰가 긍정적이라면 'positive', 중립이면 'neutral', 부정적이면 'negative'만으로 답변해주세요. 세 가지 외 다른 답변이 나오면 안됩니다."},
@@ -127,7 +128,7 @@ def process_sentiment_analysis(sentiment_data_list, original_reviews, product_li
         
     result = json.dumps(summary, ensure_ascii=False, indent=4)
 
-    output_file_path = 'result/sentiment_analysis_result_clovastudio_test.json'
+    output_file_path = 'result/sentiment_analysis_result_clovastudio.json'
     with open(output_file_path, 'w', encoding='utf-8') as file:
         file.write(result)
 
@@ -138,7 +139,7 @@ def process_sentiment_analysis(sentiment_data_list, original_reviews, product_li
 def main_process(file_path):
     review_list, product_names = load_file(file_path)
     original_reviews, preprocessed_reviews = preprocess(review_list)
-    review_list_test, original_review_list_test, product_list_test = create_test_data(preprocessed_reviews, original_reviews, product_names, sample_size=100)
+    review_list_test, original_review_list_test, product_list_test = create_test_data(preprocessed_reviews, original_reviews, product_names, sample_size='max')
     result_list = analyze_reviews_clova_studio(review_list_test)
     process_sentiment_analysis(result_list, original_review_list_test, product_list_test)
 
