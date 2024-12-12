@@ -118,7 +118,7 @@ def charts(ps_counts, output_file_prefix):
 
 
 # 감정 분석 결과 파일 로드
-results_path = 'result/sentiment_analysis_result_clovastudio.json'
+results_path = 'result/sentiment_analysis_result_kobert.json'
 results = load_result(results_path)
 
 # 전체 감정 비율 파이 차트로 저장

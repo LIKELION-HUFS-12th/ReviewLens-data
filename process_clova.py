@@ -146,5 +146,3 @@ def main_process(file_path):
 
 file_path = 'reviews/메이크업뷰티케어_reviews.xlsx'
 main_process(file_path)
-
-
